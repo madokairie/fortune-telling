@@ -6,9 +6,7 @@ import type { DailyAdvice, DailyAdviceCache } from '@/lib/types';
 
 /** 今日の日付を YYYY-MM-DD (JST) で返す */
 function getTodayJST(): string {
-  const now = new Date();
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  return jst.toISOString().split('T')[0];
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
 }
 
 interface UseDailyAdviceReturn {
@@ -53,6 +51,8 @@ export function useDailyAdvice(): UseDailyAdviceReturn {
       const dailyAdvice: DailyAdvice = {
         date: data.date,
         lunarDate: data.lunarDate || '',
+        calendar: data.calendar || undefined,
+        caution: data.caution || undefined,
         overallFortune: data.advice.overall,
         workFortune: {
           mCreate: data.advice.work.mCreate,

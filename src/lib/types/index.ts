@@ -6,6 +6,7 @@ export type ConversationCategory =
   | 'private'
   | 'health'
   | 'partnership'
+  | 'journal'
   | 'general';
 
 // --- Database Entity Types ---
@@ -52,6 +53,19 @@ export interface Settings {
 export interface DailyAdvice {
   date: string;
   lunarDate: string;
+  calendar?: {
+    yearGanZhi: string;
+    monthGanZhi: string;
+    dayGanZhi: string;
+  };
+  caution?: {
+    level: 'high' | 'medium' | 'low' | 'none';
+    isUMonth: boolean;
+    isUDay: boolean;
+    message: string;
+    nextUDays: string[];
+    uMonthPeriod: { start: string; end: string } | null;
+  };
   overallFortune: string;
   workFortune: {
     mCreate: string;

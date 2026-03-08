@@ -108,6 +108,7 @@ export function useChat() {
       'private': 'private',
       'health': 'general',
       'partnership': 'private',
+      'journal': 'journal',
       'general': 'general',
     };
     const apiCategory = categoryMap[category] || 'general';

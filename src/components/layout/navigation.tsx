@@ -2,13 +2,14 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Home, MessageCircle, User, Settings } from "lucide-react";
+import { Home, MessageCircle, BookOpen, User, Settings } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "ホーム", icon: Home },
   { href: "/chat", label: "チャット", icon: MessageCircle },
+  { href: "/summary", label: "まとめ", icon: BookOpen },
   { href: "/profile", label: "性質", icon: User },
   { href: "/settings", label: "設定", icon: Settings },
 ] as const;

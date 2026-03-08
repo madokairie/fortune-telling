@@ -23,10 +23,11 @@ interface ConversationListProps {
 const CATEGORY_LABELS: Record<ConversationCategory, string> = {
   'general': '一般',
   'business-mcreate': 'エムクリエイト',
-  'business-jyb': 'JYビー',
+  'business-jyb': 'JYB',
   'private': 'プライベート',
   'health': '健康',
   'partnership': 'パートナーシップ',
+  'journal': '出来事メモ',
 };
 
 function formatDate(date: Date): string {

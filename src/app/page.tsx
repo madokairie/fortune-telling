@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
-import { MessageCircle, Palette, Gift, RefreshCw } from 'lucide-react';
+import { MessageCircle, Palette, Gift, RefreshCw, AlertTriangle, Calendar } from 'lucide-react';
 import { useDailyAdvice } from '@/hooks/useDailyAdvice';
 import { DailyAdviceCard } from '@/components/dashboard/daily-advice-card';
 import { BusinessCard } from '@/components/dashboard/business-card';
@@ -78,7 +78,55 @@ export default function DashboardPage() {
         <h1 className="font-heading text-xl font-bold tracking-tight">
           {warekiDate}
         </h1>
+        {/* 干支表示 */}
+        {advice?.calendar && (
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Calendar className="h-3 w-3" />
+            {advice.calendar.yearGanZhi}年 {advice.calendar.monthGanZhi}月 {advice.calendar.dayGanZhi}日
+          </p>
+        )}
       </motion.header>
+
+      {/* 卯の注意バナー */}
+      {advice?.caution && advice.caution.level !== 'none' && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.2 }}
+          className={`rounded-lg border-l-4 px-4 py-3 ${
+            advice.caution.level === 'high'
+              ? 'border-l-red-500 bg-red-50 text-red-900'
+              : advice.caution.level === 'medium'
+                ? 'border-l-amber-500 bg-amber-50 text-amber-900'
+                : 'border-l-yellow-400 bg-yellow-50 text-yellow-900'
+          }`}
+        >
+          <div className="flex items-start gap-2">
+            <AlertTriangle className={`mt-0.5 h-4 w-4 flex-shrink-0 ${
+              advice.caution.level === 'high'
+                ? 'text-red-500'
+                : advice.caution.level === 'medium'
+                  ? 'text-amber-500'
+                  : 'text-yellow-500'
+            }`} />
+            <div className="space-y-1">
+              <p className="text-sm font-medium">
+                {advice.caution.level === 'high' ? '最大注意' :
+                  advice.caution.level === 'medium' ? '卯月注意期間' : '卯日注意'}
+              </p>
+              <p className="text-xs opacity-80">{advice.caution.message}</p>
+              {advice.caution.nextUDays && advice.caution.nextUDays.length > 0 && (
+                <p className="text-xs opacity-60">
+                  次の卯日: {advice.caution.nextUDays.map((d) => {
+                    const [, m, dd] = d.split('-');
+                    return `${parseInt(m)}/${parseInt(dd)}`;
+                  }).join(', ')}
+                </p>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Main content */}
       {isLoading ? (

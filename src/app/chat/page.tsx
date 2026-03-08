@@ -22,10 +22,11 @@ import type { ConversationCategory } from '@/lib/types';
 const CATEGORIES: { value: ConversationCategory; label: string }[] = [
   { value: 'general', label: '一般' },
   { value: 'business-mcreate', label: 'エムクリエイト' },
-  { value: 'business-jyb', label: 'JYビー協会' },
+  { value: 'business-jyb', label: 'JYB協会' },
   { value: 'private', label: 'プライベート' },
   { value: 'health', label: '健康' },
   { value: 'partnership', label: 'パートナーシップ' },
+  { value: 'journal', label: 'その日の出来事・思ったこと' },
 ];
 
 export default function ChatPage() {
@@ -122,7 +123,14 @@ export default function ChatPage() {
         <div className="flex min-h-full flex-col">
           {!hasMessages ? (
             <div className="flex flex-1 items-center justify-center">
-              <SuggestionChips onSelect={handleSend} />
+              <SuggestionChips
+                category={category}
+                onSelect={handleSend}
+                onStartJournal={() => {
+                  setCategory('journal');
+                  startNewConversation();
+                }}
+              />
             </div>
           ) : (
             <div className="flex flex-col gap-4 py-4">

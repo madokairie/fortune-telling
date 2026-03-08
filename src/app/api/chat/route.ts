@@ -96,7 +96,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       try {
         // Claude API ストリーミング呼び出し
         const messageStream = client.messages.stream({
-          model: 'claude-sonnet-4-6-20250514',
+          model: 'claude-sonnet-4-6',
           max_tokens: 2048,
           system: systemPrompt,
           messages: body.messages.map((m) => ({

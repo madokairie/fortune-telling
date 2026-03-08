@@ -90,7 +90,7 @@ const PROFILE_DATA: ProfileResponse = {
       role: '代表',
     },
     {
-      name: 'JYビー協会',
+      name: 'JYB協会',
       description: '陰陽五行美容ベースの体質改善サポート',
       role: '代表',
     },

@@ -15,7 +15,7 @@ const config = {
     icon: Briefcase,
   },
   jybee: {
-    label: 'JYビー協会',
+    label: 'JYB協会',
     icon: Heart,
   },
 } as const;

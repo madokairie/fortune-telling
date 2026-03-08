@@ -2,17 +2,36 @@
  * GET /api/daily-advice
  *
  * 今日のアドバイス生成エンドポイント
- * 円香さんの命盤 + 当日情報をプロンプトに含めてClaude APIで生成
+ * 実際の干支暦データ + 命盤 + 四化影響をプロンプトに含めてClaude APIで生成
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { buildDailyAdvicePrompt } from '@/lib/ai/system-prompt';
 import { searchKnowledge } from '@/lib/ai/knowledge';
+import {
+  getDailyFortuneData,
+  getNextUDays,
+  getUMonthPeriod,
+  type DailyFortuneData,
+} from '@/lib/fortune/calendar';
 
 /** アドバイスレスポンスの型 */
 interface DailyAdviceResponse {
   date: string;
+  calendar: {
+    yearGanZhi: string;
+    monthGanZhi: string;
+    dayGanZhi: string;
+  };
+  caution: {
+    level: 'high' | 'medium' | 'low' | 'none';
+    isUMonth: boolean;
+    isUDay: boolean;
+    message: string;
+    nextUDays: string[];
+    uMonthPeriod: { start: string; end: string } | null;
+  };
   advice: {
     overall: string;
     work: {
@@ -31,10 +50,49 @@ interface DailyAdviceResponse {
  * 今日の日付を YYYY-MM-DD 形式で取得する（JST）
  */
 function getTodayJST(): string {
-  const now = new Date();
-  const jstOffset = 9 * 60; // UTC+9
-  const jst = new Date(now.getTime() + jstOffset * 60 * 1000);
-  return jst.toISOString().split('T')[0];
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
+}
+
+/**
+ * 運勢データをAI用のコンテキスト文字列に変換
+ */
+function buildFortuneContext(fortune: DailyFortuneData): string {
+  const { yearGanZhi, monthGanZhi, dayGanZhi, caution, fortuneImpact } = fortune;
+
+  const lines: string[] = [
+    `## 今日の暦データ（計算済み）`,
+    `- 西暦: ${fortune.date}`,
+    `- 年柱: ${yearGanZhi.full}（${yearGanZhi.stem}${yearGanZhi.branch}年）`,
+    `- 月柱: ${monthGanZhi.full}（${monthGanZhi.stem}${monthGanZhi.branch}月）`,
+    `- 日柱: ${dayGanZhi.full}（${dayGanZhi.stem}${dayGanZhi.branch}日）`,
+    '',
+    `## 日の四化（${dayGanZhi.stem}日の飛星）`,
+    `- 化禄: ${fortuneImpact.daySiHua.huaLu}`,
+    `- 化権: ${fortuneImpact.daySiHua.huaQuan}`,
+    `- 化科: ${fortuneImpact.daySiHua.huaKe}`,
+    `- 化忌: ${fortuneImpact.daySiHua.huaJi}`,
+  ];
+
+  if (fortuneImpact.impacts.length > 0) {
+    lines.push('', `## 命盤への影響`);
+    for (const impact of fortuneImpact.impacts) {
+      const emoji = impact.effect === 'positive' ? '✦' : '⚠';
+      lines.push(`${emoji} ${impact.description}`);
+    }
+    lines.push(`→ 総合判定: ${fortuneImpact.overallTone}`);
+  }
+
+  if (caution.level !== 'none') {
+    lines.push(
+      '',
+      `## ⚠️ 卯の注意（レベル: ${caution.level}）`,
+      caution.message,
+      `- 卯月: ${caution.isUMonth ? 'はい' : 'いいえ'}`,
+      `- 卯日: ${caution.isUDay ? 'はい' : 'いいえ'}`
+    );
+  }
+
+  return lines.join('\n');
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -60,13 +118,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
+    // 干支暦データを計算
+    const fortuneData = getDailyFortuneData(date);
+    const fortuneContext = buildFortuneContext(fortuneData);
+    const nextUDays = getNextUDays(date, 3);
+    const year = parseInt(date.split('-')[0]);
+    const uMonthPeriod = getUMonthPeriod(year);
+
     // RAG検索（今日の運勢に関連するナレッジ）
     let ragContext: string | undefined;
     try {
-      const ragResults = await searchKnowledge(
-        `${date} 今日の運勢 アドバイス 方位 ラッキー`,
-        3
-      );
+      // 干支情報を含めてRAG検索（より関連性の高い結果を得る）
+      const ragQuery = `${date} ${fortuneData.dayGanZhi.full} ${fortuneData.monthGanZhi.branch}月 運勢 アドバイス 方位`;
+      const ragResults = await searchKnowledge(ragQuery, 3);
       if (ragResults.length > 0) {
         ragContext = ragResults.join('\n\n---\n\n');
       }
@@ -74,20 +138,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       console.warn('[daily-advice] RAG search failed:', error);
     }
 
-    // プロンプト構築
-    const systemPrompt = buildDailyAdvicePrompt(date, ragContext);
+    // プロンプト構築（実際の暦データを注入）
+    const systemPrompt = buildDailyAdvicePrompt(date, ragContext, fortuneContext);
 
     // Claude API 呼び出し（非ストリーミング）
     const client = new Anthropic({ apiKey });
 
     const message = await client.messages.create({
-      model: 'claude-sonnet-4-6-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       system: systemPrompt,
       messages: [
         {
           role: 'user',
-          content: `${date}の円香さんへのアドバイスをJSON形式で生成してください。`,
+          content: `${date}（${fortuneData.dayGanZhi.full}日）の円香さんへのアドバイスをJSON形式で生成してください。`,
         },
       ],
     });
@@ -101,7 +165,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // JSONパース（コードブロックの除去も対応）
     let adviceData: DailyAdviceResponse['advice'];
     try {
-      // ```json ... ``` で囲まれている場合を考慮
       const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
       const jsonStr = jsonMatch ? jsonMatch[1].trim() : responseText.trim();
       adviceData = JSON.parse(jsonStr);
@@ -113,9 +176,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // レスポンス構築
+    // レスポンス構築（暦データ + 注意情報を含む）
     const response: DailyAdviceResponse = {
       date,
+      calendar: {
+        yearGanZhi: fortuneData.yearGanZhi.full,
+        monthGanZhi: fortuneData.monthGanZhi.full,
+        dayGanZhi: fortuneData.dayGanZhi.full,
+      },
+      caution: {
+        level: fortuneData.caution.level,
+        isUMonth: fortuneData.caution.isUMonth,
+        isUDay: fortuneData.caution.isUDay,
+        message: fortuneData.caution.message,
+        nextUDays,
+        uMonthPeriod,
+      },
       advice: {
         overall: adviceData.overall || '',
         work: {
@@ -132,7 +208,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(response, {
       headers: {
-        // 1日キャッシュ（s-maxage はCDN向け、max-age はブラウザ向け）
         'Cache-Control': 'public, s-maxage=86400, max-age=3600, stale-while-revalidate=86400',
       },
     });
