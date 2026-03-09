@@ -64,11 +64,6 @@ export default function ChatPage() {
       {/* Header */}
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-border/50 px-4">
         <div className="flex items-center gap-2">
-          <ConversationList
-            conversations={conversations}
-            currentId={currentConversationId}
-            onSelect={switchConversation}
-          />
           <h1 className="font-heading text-base font-medium">AI相談</h1>
         </div>
 
@@ -106,14 +101,22 @@ export default function ChatPage() {
             </SheetContent>
           </Sheet>
 
+          {/* Past conversations */}
+          <ConversationList
+            conversations={conversations}
+            currentId={currentConversationId}
+            onSelect={switchConversation}
+          />
+
           {/* New conversation button */}
           <Button
-            variant="ghost"
-            size="icon-sm"
+            variant="outline"
+            size="sm"
             onClick={startNewConversation}
-            aria-label="新しい会話"
+            className="gap-1 text-xs"
           >
-            <Plus className="size-4" />
+            <Plus className="size-3.5" />
+            新規
           </Button>
         </div>
       </div>

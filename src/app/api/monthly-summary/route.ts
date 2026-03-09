@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { getDailyFortuneData, getUMonthPeriod } from '@/lib/fortune/calendar';
+import { saveMonthlySummary, getMonthlySummary } from '@/lib/server/conversations';
 
 interface MonthlySummaryRequest {
   year: number;
@@ -187,7 +188,7 @@ ${conversationContext || '（記録なし）'}
       );
     }
 
-    return NextResponse.json({
+    const result = {
       year: body.year,
       month: body.month,
       conversationCount: body.conversations.length,
@@ -197,7 +198,14 @@ ${conversationContext || '（記録なし）'}
       },
       ...summaryData,
       generatedAt: new Date().toISOString(),
+    };
+
+    // サーバーに保存（次回以降はこれを読む）
+    await saveMonthlySummary(body.year, body.month, result).catch((err) => {
+      console.warn('[monthly-summary] Failed to save:', err);
     });
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error('[monthly-summary] Error:', error);
 

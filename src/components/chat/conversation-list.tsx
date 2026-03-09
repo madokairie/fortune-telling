@@ -1,6 +1,6 @@
 'use client';
 
-import { MessageCircle } from 'lucide-react';
+import { History } from 'lucide-react';
 import {
   Sheet,
   SheetTrigger,
@@ -54,8 +54,9 @@ export function ConversationList({
     <Sheet>
       <SheetTrigger
         render={
-          <Button variant="ghost" size="icon-sm" aria-label="会話履歴">
-            <MessageCircle className="size-4" />
+          <Button variant="outline" size="sm" className="gap-1 text-xs" aria-label="会話履歴">
+            <History className="size-3.5" />
+            履歴
           </Button>
         }
       />
@@ -68,7 +69,7 @@ export function ConversationList({
         <ScrollArea className="flex-1 px-4">
           {!conversations || conversations.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-12 text-center">
-              <MessageCircle className="size-8 text-muted-foreground/40" />
+              <History className="size-8 text-muted-foreground/40" />
               <p className="text-sm text-muted-foreground">会話履歴はまだありません</p>
             </div>
           ) : (

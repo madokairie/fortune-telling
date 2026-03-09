@@ -16,6 +16,23 @@ interface SSEEvent {
   }>;
 }
 
+/** サーバーにメッセージを保存（失敗しても無視） */
+function syncToServer(params: {
+  conversationId: number;
+  title: string;
+  category: string;
+  role: 'user' | 'assistant';
+  content: string;
+}) {
+  fetch('/api/conversations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  }).catch(() => {
+    // サーバー保存失敗は無視（IndexedDBには保存済み）
+  });
+}
+
 export function useChat() {
   const {
     currentConversationId,
@@ -88,6 +105,19 @@ export function useChat() {
     await db.conversations.update(convId, {
       updatedAt: new Date(),
       messageCount: ((await db.messages.where('conversationId').equals(convId).count()) || 0),
+    });
+
+    // Get conversation title for server sync
+    const conv = await db.conversations.get(convId);
+    const convTitle = conv?.title || content.slice(0, 40);
+
+    // サーバーにも保存
+    syncToServer({
+      conversationId: convId,
+      title: convTitle,
+      category,
+      role: 'user',
+      content,
     });
 
     // Build message history for API
@@ -205,6 +235,16 @@ export function useChat() {
         await db.conversations.update(convId, {
           updatedAt: new Date(),
           messageCount: ((await db.messages.where('conversationId').equals(convId).count()) || 0),
+        });
+
+        // サーバーにも保存
+        const conv = await db.conversations.get(convId);
+        syncToServer({
+          conversationId: convId,
+          title: conv?.title || '',
+          category,
+          role: 'assistant',
+          content: fullContent,
         });
       }
     } catch (error) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'motion/react';
 import {
   ChevronLeft,
@@ -14,7 +14,6 @@ import {
   Loader2,
   Compass,
 } from 'lucide-react';
-import { db } from '@/lib/db';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
@@ -67,6 +66,26 @@ export default function SummaryPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 保存済みまとめがあれば自動読み込み
+  const loadSavedSummary = useCallback(async (y: number, m: number) => {
+    try {
+      const res = await fetch(`/api/monthly-summary/saved?year=${y}&month=${m}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data) {
+          setSummary(data);
+        }
+      }
+    } catch {
+      // 保存済みがなければ何もしない
+    }
+  }, []);
+
+  useEffect(() => {
+    setSummary(null);
+    loadSavedSummary(year, month);
+  }, [year, month, loadSavedSummary]);
+
   const goToPrevMonth = () => {
     if (month === 1) {
       setYear(year - 1);
@@ -74,7 +93,6 @@ export default function SummaryPage() {
     } else {
       setMonth(month - 1);
     }
-    setSummary(null);
   };
 
   const goToNextMonth = () => {
@@ -84,7 +102,6 @@ export default function SummaryPage() {
     } else {
       setMonth(month + 1);
     }
-    setSummary(null);
   };
 
   const generateSummary = useCallback(async () => {
@@ -92,30 +109,27 @@ export default function SummaryPage() {
     setError(null);
 
     try {
-      const monthStart = new Date(year, month - 1, 1);
-      const monthEnd = new Date(year, month, 0, 23, 59, 59);
+      // サーバー側に保存された会話データを取得
+      const convRes = await fetch(`/api/conversations?year=${year}&month=${month}`);
+      if (!convRes.ok) {
+        throw new Error('会話データの取得に失敗しました');
+      }
+      const convData = await convRes.json();
 
-      const allConversations = await db.conversations
-        .where('createdAt')
-        .between(monthStart, monthEnd)
-        .toArray();
+      if (!convData.conversations || convData.conversations.length === 0) {
+        throw new Error(`${year}年${month}月の会話記録がありません`);
+      }
 
-      const conversationsWithMessages = await Promise.all(
-        allConversations.map(async (conv) => {
-          const messages = await db.messages
-            .where('conversationId')
-            .equals(conv.id!)
-            .sortBy('createdAt');
-
-          return {
-            category: conv.category,
-            title: conv.title,
-            date: conv.createdAt.toISOString().split('T')[0],
-            messages: messages.map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
-          };
+      // サーバーデータをまとめAPI用に変換
+      const conversationsWithMessages = convData.conversations.map(
+        (conv: { category: string; title: string; createdAt: string; messages: Array<{ role: string; content: string }> }) => ({
+          category: conv.category,
+          title: conv.title,
+          date: conv.createdAt.split('T')[0],
+          messages: conv.messages.map((m: { role: string; content: string }) => ({
+            role: m.role,
+            content: m.content,
+          })),
         })
       );
 

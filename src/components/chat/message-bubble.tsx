@@ -89,7 +89,7 @@ export function MessageBubble({
         className={cn(
           'max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
           isUser
-            ? 'bg-[#2a2440] text-foreground rounded-br-md'
+            ? 'bg-brand-indigo text-brand-pearl rounded-br-md'
             : 'bg-card text-card-foreground rounded-bl-md'
         )}
       >

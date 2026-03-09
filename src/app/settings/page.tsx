@@ -11,6 +11,8 @@ import {
   Database,
   BookOpen,
   RefreshCw,
+  Download,
+  FolderInput,
 } from 'lucide-react';
 import { db } from '@/lib/db';
 import { Card, CardContent } from '@/components/ui/card';
@@ -175,6 +177,102 @@ export default function SettingsPage() {
     } finally {
       setIsClearing(false);
     }
+  };
+
+  // --- Export ---
+  const exportData = async () => {
+    try {
+      const [conversations, messages, bookmarks] = await Promise.all([
+        db.conversations.toArray(),
+        db.messages.toArray(),
+        db.bookmarks.toArray(),
+      ]);
+
+      const exportObj = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        conversations,
+        messages,
+        bookmarks,
+      };
+
+      const blob = new Blob([JSON.stringify(exportObj, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const dateStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
+      a.download = `fortune-telling-backup-${dateStr}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setClearMessage('データをエクスポートしました');
+    } catch {
+      setClearMessage('エクスポートに失敗しました');
+    }
+  };
+
+  // --- Import ---
+  const importData = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      if (!data.version || !data.conversations || !data.messages) {
+        setClearMessage('無効なバックアップファイルです');
+        return;
+      }
+
+      const existingCount = await db.conversations.count();
+      if (existingCount > 0) {
+        if (!confirm(`既存の会話が${existingCount}件あります。インポートしたデータを追加しますか？（既存データは残ります）`)) {
+          return;
+        }
+      }
+
+      // IDの衝突を避けるため、既存の最大IDを取得
+      const maxConvId = (await db.conversations.orderBy('id').last())?.id || 0;
+      const maxMsgId = (await db.messages.orderBy('id').last())?.id || 0;
+
+      // IDマッピング（旧ID → 新ID）
+      const convIdMap = new Map<number, number>();
+
+      // 会話をインポート
+      for (const conv of data.conversations) {
+        const oldId = conv.id;
+        const newId = maxConvId + oldId;
+        convIdMap.set(oldId, newId);
+        await db.conversations.add({
+          ...conv,
+          id: newId,
+          createdAt: new Date(conv.createdAt),
+          updatedAt: new Date(conv.updatedAt),
+        });
+      }
+
+      // メッセージをインポート（会話IDを付け替え）
+      for (const msg of data.messages) {
+        const newConvId = convIdMap.get(msg.conversationId);
+        if (!newConvId) continue;
+        await db.messages.add({
+          ...msg,
+          id: maxMsgId + msg.id,
+          conversationId: newConvId,
+          createdAt: new Date(msg.createdAt),
+        });
+      }
+
+      await fetchCounts();
+      setClearMessage(`${data.conversations.length}件の会話をインポートしました`);
+    } catch {
+      setClearMessage('インポートに失敗しました。ファイル形式を確認してください');
+    }
+
+    // input をリセット
+    e.target.value = '';
   };
 
   const formatSize = (bytes: number) => {
@@ -407,6 +505,38 @@ export default function SettingsPage() {
                   <p className="text-xs text-muted-foreground">
                     {conversationCount}件の会話
                   </p>
+                </div>
+              </div>
+
+              {/* エクスポート / インポート */}
+              <div className="flex items-center justify-between px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium">バックアップ</p>
+                  <p className="text-xs text-muted-foreground">
+                    会話データをJSONでエクスポート / インポート
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={exportData}
+                    disabled={conversationCount === 0}
+                    className="gap-1.5 text-xs"
+                  >
+                    <Download className="h-3 w-3" />
+                    保存
+                  </Button>
+                  <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent hover:text-accent-foreground">
+                    <FolderInput className="h-3 w-3" />
+                    復元
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={importData}
+                      className="hidden"
+                    />
+                  </label>
                 </div>
               </div>
 
